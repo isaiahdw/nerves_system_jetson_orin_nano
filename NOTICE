@@ -1,0 +1,12 @@
+This Nerves system aggregates content under the following licenses:
+
+| Content | License | Source |
+|---|---|---|
+| Build configuration, scripts, overlay (this repo) | GPL-2.0-or-later | this repository |
+| Linux kernel (NVIDIA linux-noble, Jetson Linux r39.2) | GPL-2.0-only | gitlab.com/nvidia/nv-tegra/3rdparty/canonical/linux-noble |
+| RTL8822CE WiFi/BT firmware | redistributable, see linux-firmware WHENCE | linux-firmware |
+| uefi/BOOTAA64.efi (L4TLauncher) | BSD-2-Clause-Patent | github.com/NVIDIA/edk2-nvidia (binary from L4T r36.4.3; see uefi/README.md) |
+| nvbootctrl (package/nvbootctrl) | NVIDIA L4T license (proprietary, redistributable) | repo.download.nvidia.com/jetson nvidia-l4t-tools 36.4.4 deb |
+
+Buildroot-built packages carry their own licenses; `make legal-info`
+output ships with the release artifact.

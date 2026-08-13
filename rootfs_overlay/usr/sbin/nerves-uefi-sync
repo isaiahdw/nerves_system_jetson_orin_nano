@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Make the boot firmware agree with nerves_fw_active about which slot
+# boots next. Run after `fwup` upgrade/revert completes and before the
+# reboot.
+#
+# Mechanism (UEFI 36.4.3, rootfs A/B redundancy DISABLED - the current
+# state): L4TLauncher boots whichever boot partition is GPT-named "APP".
+# Slot switching is therefore a name swap between p2 and p3, written
+# with sgdisk. The rootfs is selected by each slot's extlinux root=
+# PARTUUID, which never changes - only the two FAT partitions' names
+# move. Idempotent: if the names already agree with nerves_fw_active,
+# nothing is written.
+#
+# When RootfsRedundancyLevel is enabled in the firmware (a QSPI
+# provisioning step, see docs/provisioning.md), L4TLauncher instead picks
+# APP vs APP_b from its rootfs A/B state (RootfsStatusSlot* UEFI
+# variables + retry counters in a Tegra scratch register) and the name
+# swap must NOT be used. That path needs nvbootctrl (or scratch-register
+# access) and is not implemented yet; this script refuses to guess.
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+DISK=/dev/nvme0n1
+EFIVARS=/sys/firmware/efi/efivars
+GUID=781e084c-a330-417c-b678-38e696380cb9
+
+active=$(fw_printenv -n nerves_fw_active 2>/dev/null)
+case "$active" in
+    a|b) ;;
+    *) echo "nerves-uefi-sync: no nerves_fw_active, nothing to do"; exit 0 ;;
+esac
+
+# Refuse the name-swap when firmware-level rootfs A/B is enabled: the
+# firmware would be picking slots by its own state at the same time.
+if [ -e "$EFIVARS/RootfsRedundancyLevel-$GUID" ]; then
+    # sed, not tr: this busybox has no tr applet.
+    level=$(od -An -j4 -N1 -tu1 "$EFIVARS/RootfsRedundancyLevel-$GUID" 2>/dev/null | sed 's/ //g')
+    if [ "${level:-0}" != "0" ]; then
+        echo "nerves-uefi-sync: rootfs redundancy is enabled in firmware;" >&2
+        echo "nerves-uefi-sync: name-swap switching disabled - nvbootctrl path not implemented" >&2
+        exit 1
+    fi
+fi
+
+# sgdisk with retries: when this runs right after an fwup upgrade (the
+# nerves_ssh success_callback path), the device handle fwup held may not
+# be released yet and sgdisk fails transiently.
+swap_names() {
+    n=0
+    while [ $n -lt 5 ]; do
+        sgdisk -c 2:"$1" -c 3:"$2" "$DISK" && return 0
+        rc=$?
+        n=$((n + 1))
+        echo "nerves-uefi-sync: sgdisk failed (rc=$rc), retry $n/5" >&2
+        sleep 1
+    done
+    return 1
+}
+
+# Which partition is currently named APP? Slot A's boot FAT is p2,
+# slot B's is p3 (fwup_include/fwup-common.conf).
+p2name=$(sgdisk -i 2 "$DISK" 2>/dev/null | sed -n "s/^Partition name: '\(.*\)'$/\1/p")
+case "$active/$p2name" in
+    a/APP | b/APP_b)
+        echo "nerves-uefi-sync: boot partition names already agree (active=$active)"
+        exit 0
+        ;;
+    a/APP_b)
+        echo "nerves-uefi-sync: pointing firmware at slot A"
+        swap_names APP APP_b
+        ;;
+    b/APP)
+        echo "nerves-uefi-sync: pointing firmware at slot B"
+        swap_names APP_b APP
+        ;;
+    *)
+        echo "nerves-uefi-sync: unexpected partition 2 name '$p2name'" >&2
+        exit 1
+        ;;
+esac

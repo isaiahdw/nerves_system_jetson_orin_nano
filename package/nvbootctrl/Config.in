@@ -1,0 +1,16 @@
+config BR2_PACKAGE_NVBOOTCTRL
+	bool "nvbootctrl"
+	help
+	  NVIDIA's boot-chain control tool for Jetson (t234), extracted
+	  from the nvidia-l4t-tools Debian package. Marks boots
+	  successful so the UEFI firmware's per-boot retry counters
+	  reset - without this, three boots without a "verify" latch
+	  "OS chain A status" to Unbootable and the firmware stops
+	  attempting Direct Boot (docs/provisioning.md). Also used for
+	  rootfs A/B slot control once firmware redundancy is enabled.
+
+	  Needs /etc/nv_boot_control.conf (shipped in rootfs_overlay,
+	  values mirrored from this board's TegraPlatformSpec UEFI
+	  variable) and efivarfs mounted.
+
+	  https://repo.download.nvidia.com/jetson/

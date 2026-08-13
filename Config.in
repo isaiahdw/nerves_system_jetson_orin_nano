@@ -1,0 +1,4 @@
+# Custom Buildroot packages for this system. The NVIDIA out-of-tree
+# kernel modules (nvidia-oot/nvgpu) and the CUDA/TensorRT userland
+# arrive as further package/<name>/ entries sourced here.
+source "$NERVES_DEFCONFIG_DIR/package/nvbootctrl/Config.in"

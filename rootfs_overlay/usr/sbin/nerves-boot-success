@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Mark this boot successful to the boot firmware so its per-boot retry
+# counters reset. Run unconditionally early in boot (erlinit
+# --pre-run-exec), mirroring stock L4T's nv_update_verifier service:
+# without it, three boots latch "OS chain A status" to Unbootable and
+# the firmware stops attempting Direct Boot (docs/provisioning.md has
+# the manual recovery).
+#
+# This clears BOOT-CHAIN (firmware) retry state only. Nerves-level
+# firmware validation (nerves_fw_validated, revert) is a separate,
+# health-gated decision made by the application - the two layers are
+# deliberately independent.
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# efivarfs must be mounted (erlinit mounts it; cover the pre-run-exec
+# ordering case where it isn't yet).
+mountpoint -q /sys/firmware/efi/efivars 2>/dev/null || \
+    mount -t efivarfs efivarfs /sys/firmware/efi/efivars 2>/dev/null
+
+# Plain -x test: this busybox has no `command` builtin.
+if [ ! -x /usr/sbin/nvbootctrl ]; then
+    echo "nerves-boot-success: nvbootctrl not installed" >&2
+    exit 1
+fi
+
+# Unconditional verify is only correct while firmware rootfs redundancy
+# is OFF (the boot-chain retry counters are the only thing at stake). If
+# redundancy is ever enabled, an early unconditional verify would defeat
+# the firmware's failover - the verify must then move behind the Nerves
+# validation decision. Refuse rather than silently weaken failover.
+GUID=781e084c-a330-417c-b678-38e696380cb9
+rl=/sys/firmware/efi/efivars/RootfsRedundancyLevel-$GUID
+if [ -e "$rl" ]; then
+    level=$(od -An -j4 -N1 -tu1 "$rl" 2>/dev/null | sed 's/ //g')
+    if [ "${level:-0}" != "0" ]; then
+        echo "nerves-boot-success: rootfs redundancy enabled; unconditional verify disabled" >&2
+        echo "nerves-boot-success: gate verify on Nerves validation before using this mode" >&2
+        exit 0
+    fi
+fi
+
+nvbootctrl verify
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "nerves-boot-success: nvbootctrl verify failed ($rc)" >&2
+fi
+exit 0

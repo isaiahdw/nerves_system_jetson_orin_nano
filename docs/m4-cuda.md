@@ -41,6 +41,25 @@ a prebuilt binary, so GPU+CUDA+TensorRT can be proven end-to-end
 (`trtexec --onnx=<model>`) with no CUDA cross-compilation. Ortex/ONNX
 Runtime comes after that proof.
 
+## GPU userspace packaging notes (next work item)
+
+- BSP driver tarball: `https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.0/release/Jetson_Linux_R39.2.0_aarch64.tbz2`
+  (1.2 GB, sha256 `1626626cd827de0e350b8802033b9da653c69b2290accedb9e5d01f49607e099`;
+  pre-seeded in `~/.nerves/dl/tegra-libs/`).
+- `package/tegra-libs` (plan): mirror `tegra-libraries-cuda` +
+  `tegra-libraries-core` from meta-tegra master — libcuda.so.1.1 comes
+  from `opt/nvidia/l4t-gpu-libs/<CUDA_DRV_VARIANT>/` (the 595-series
+  compat driver dir), plus libnvidia-ptxjitcompiler, libnvidia-nvvm,
+  and the RM stack (libnvrm_gpu/mem/host1x/chip, libnvos, ...) from
+  `usr/lib/aarch64-linux-gnu/nvidia/` inside the deb-payload area of
+  the tarball. Read those two recipes for the full lists and symlink
+  farm.
+- Then `package/cuda-cudart` (deb), `package/tensorrt-*` (debs incl.
+  the prebuilt trtexec), `package/cudnn` (deb) — versions in the table
+  above.
+- Rootfs will blow past the 1 GiB slot immediately: do the 4 GiB GPT
+  relayout with the first oversized build (full reflash via USB drive).
+
 **Status 2026-08-13:** kernel side DONE — nvgpu/hwpm modules +
 NVIDIA -nv DTBs built by package/nvidia-oot; /dev/nvgpu/igpu0 verified
 on hardware. Next: tegra GPU userspace libs (BSP tarball) + cuda-cudart

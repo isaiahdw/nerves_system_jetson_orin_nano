@@ -36,6 +36,14 @@ Debs fetched from `https://repo.download.nvidia.com/jetson` +
 class/pool paths per `l4t_deb_pkgfeed.bbclass`; version suffix pattern
 `<name>_<ver>_arm64.deb`.
 
+**Engine strategy (owner decision 2026-08-13):** build-on-first-run —
+the full TensorRT builder ships in the production image; the
+application builds engines from ONNX at first startup and caches them
+on the data partition (survives A/B updates; TRT upgrades invalidate
+the cache and trigger a natural rebuild). No lean-runtime diet image,
+no golden-device engine pipeline. The 4 GiB slots / ~2.5 GB rootfs are
+the production shape.
+
 **Smoke-test strategy:** `tensorrt-trtexec-prebuilt` — trtexec ships as
 a prebuilt binary, so GPU+CUDA+TensorRT can be proven end-to-end
 (`trtexec --onnx=<model>`) with no CUDA cross-compilation. Ortex/ONNX

@@ -11,14 +11,55 @@
   during bring-up; restore, if ever wanted, via Waveshare's wiki image +
   SDK Manager recovery-mode flash).
 
-## Writing a new device
+## Writing a new device — the two supported procedures
 
-1. QSPI: a stock JetPack-6-generation firmware (36.x) works as-is. No
-   reflash needed for name-swap A/B.
-2. Disk: `fwup -a -t complete -i <fw> -d <disk>` (USB stick or NVMe).
-   The image is self-contained: ESP + L4TLauncher included.
-3. Never leave two disks written from this image attached at once — they
-   carry identical PARTUUIDs and `root=` resolution races.
+These are the only supported ways to put this firmware on an internal
+disk. Do not improvise transports (device-side staging on unknown
+media, ad-hoc network copies): multi-gigabyte payloads must be
+verifiable at every hop, and both procedures below are.
+
+### Procedure A: offline media provisioning (factory path)
+
+The provisioning media carries both the bootable system and the payload.
+
+1. On the host: write a USB drive with the provisioner task —
+   `fwup -a -t complete-provisioner -i <fw> -d /dev/rdiskN`. Identical
+   to `complete` except the data partition becomes a FAT32 "STAGING"
+   volume the host can write.
+2. The STAGING volume mounts automatically; copy the target's `.fw`
+   onto it and verify: `shasum -a 256` of the copy must match the
+   original before ejecting.
+3. Boot the device from the drive (UEFI Boot Manager or shell if the
+   internal disk still outranks it; a direct EFI-stub launch with
+   `root=/dev/sda4` avoids PARTUUID ambiguity when the internal disk
+   carries the same image).
+4. On the device: `umount /root` if mounted, then
+   `fwup -a -t complete -i /path/to/staged.fw -d /dev/nvme0n1
+   --enable-trim`. Local file, no network.
+5. Power off, remove the drive, boot. Never leave the drive attached
+   afterwards — it shares PARTUUIDs with the internal disk.
+
+### Procedure B: online full reflash (reachable device, no media)
+
+The application exposes a second ssh_subsystem_fwup instance named
+`fwup_provision` bound to the internal disk with the `complete` task:
+
+    ssh -s nerves@<ip> fwup_provision < firmware.fw
+
+SSH's transport integrity covers the stream; fwup verifies as it
+applies. `require-unmounted-destination` makes the task refuse on a
+system booted from the target disk — so this only works from a
+media-booted system (procedure A's step 3) or another OS, by design.
+Routine A/B upgrades continue to use `mix upload` (the standard `fwup`
+subsystem); procedure B is only for layout changes and factory resets.
+
+### Rules
+
+- Verify a hash after every copy of a firmware archive; sizes lie.
+- Never stage payloads on device-formatted partitions of unknown media
+  (silent flash corruption cost this project an evening).
+- Layout-changing firmware must never ship via `mix upload` — the
+  upgrade task would write at the old offsets.
 
 ## Slot switching today (redundancy off)
 

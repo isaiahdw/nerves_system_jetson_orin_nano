@@ -75,9 +75,33 @@ NERVES_NVOOT_HASH = \
 NERVES_NVOOT_DIR = $(BUILD_DIR)/nvidia-oot-$(NVIDIA_OOT_VERSION)
 NERVES_NVOOT_STAMP = $(NERVES_NVOOT_DIR)/.nerves-pkg-hash
 
+# tegra-libs and tensorrt-runtime: same guard - their extract steps
+# select and post-process content, so .mk edits must discard the tree.
+NERVES_TEGRA_LIBS_HASH = \
+	$(call nerves-hash,$(sort $(wildcard $(NERVES_DEFCONFIG_DIR)/package/tegra-libs/*)))
+NERVES_TEGRA_LIBS_DIR = $(BUILD_DIR)/tegra-libs-$(TEGRA_LIBS_VERSION)
+NERVES_TEGRA_LIBS_STAMP = $(NERVES_TEGRA_LIBS_DIR)/.nerves-pkg-hash
+
+define TEGRA_LIBS_RECORD_PKG_HASH
+	echo $(NERVES_TEGRA_LIBS_HASH) > $(NERVES_TEGRA_LIBS_STAMP)
+endef
+TEGRA_LIBS_POST_EXTRACT_HOOKS += TEGRA_LIBS_RECORD_PKG_HASH
+
+NERVES_TRT_HASH = \
+	$(call nerves-hash,$(sort $(wildcard $(NERVES_DEFCONFIG_DIR)/package/tensorrt-runtime/*)))
+NERVES_TRT_DIR = $(BUILD_DIR)/tensorrt-runtime-$(TENSORRT_RUNTIME_VERSION)
+NERVES_TRT_STAMP = $(NERVES_TRT_DIR)/.nerves-pkg-hash
+
+define TENSORRT_RUNTIME_RECORD_PKG_HASH
+	echo $(NERVES_TRT_HASH) > $(NERVES_TRT_STAMP)
+endef
+TENSORRT_RUNTIME_POST_EXTRACT_HOOKS += TENSORRT_RUNTIME_RECORD_PKG_HASH
+
 NERVES_STALE_DISCARDED := \
 	$(call nerves-discard-if-stale,$(LINUX_DIR),$(NERVES_LINUX_PATCH_STAMP),$(NERVES_LINUX_PATCH_HASH)) \
-	$(call nerves-discard-if-stale,$(NERVES_NVOOT_DIR),$(NERVES_NVOOT_STAMP),$(NERVES_NVOOT_HASH))
+	$(call nerves-discard-if-stale,$(NERVES_NVOOT_DIR),$(NERVES_NVOOT_STAMP),$(NERVES_NVOOT_HASH)) \
+	$(call nerves-discard-if-stale,$(NERVES_TEGRA_LIBS_DIR),$(NERVES_TEGRA_LIBS_STAMP),$(NERVES_TEGRA_LIBS_HASH)) \
+	$(call nerves-discard-if-stale,$(NERVES_TRT_DIR),$(NERVES_TRT_STAMP),$(NERVES_TRT_HASH))
 
 define NERVES_LINUX_RECORD_PATCH_HASH
 	echo $(NERVES_LINUX_PATCH_HASH) > $(NERVES_LINUX_PATCH_STAMP)
@@ -88,3 +112,4 @@ define NVIDIA_OOT_RECORD_PKG_HASH
 	echo $(NERVES_NVOOT_HASH) > $(NERVES_NVOOT_STAMP)
 endef
 NVIDIA_OOT_POST_EXTRACT_HOOKS += NVIDIA_OOT_RECORD_PKG_HASH
+

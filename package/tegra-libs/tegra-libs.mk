@@ -14,7 +14,9 @@ TEGRA_LIBS_DEB_VER = 39.2.0-20260601141651
 TEGRA_LIBS_DEBS = \
 	nvidia-l4t-core_$(TEGRA_LIBS_DEB_VER)_arm64.deb \
 	nvidia-l4t-cuda_$(TEGRA_LIBS_DEB_VER)_arm64.deb \
-	nvidia-l4t-cuda-nvgpu_$(TEGRA_LIBS_DEB_VER)_arm64.deb
+	nvidia-l4t-cuda-nvgpu_$(TEGRA_LIBS_DEB_VER)_arm64.deb \
+	nvidia-l4t-firmware_$(TEGRA_LIBS_DEB_VER)_arm64.deb \
+	nvidia-l4t-firmware-nvgpu_$(TEGRA_LIBS_DEB_VER)_arm64.deb
 
 # Pull just the needed debs out of the 1.2 GB tarball, then unpack each
 # (a .deb is an ar archive; GNU tar cannot read it directly).
@@ -40,6 +42,14 @@ define TEGRA_LIBS_INSTALL_TARGET_CMDS
 		cp -a $(@D)/usr/lib/aarch64-linux-gnu/nvidia/. $(TARGET_DIR)/usr/lib/ 2>/dev/null || true; \
 		find $(@D)/usr/lib/aarch64-linux-gnu -maxdepth 1 -type f -name "*.so*" \
 			-exec cp -a {} $(TARGET_DIR)/usr/lib/ \; ; \
+	fi
+	if [ -d $(@D)/lib/firmware ]; then \
+		mkdir -p $(TARGET_DIR)/lib/firmware && \
+		cp -a $(@D)/lib/firmware/. $(TARGET_DIR)/lib/firmware/; \
+	fi
+	if [ -d $(@D)/usr/lib/firmware ]; then \
+		mkdir -p $(TARGET_DIR)/lib/firmware && \
+		cp -a $(@D)/usr/lib/firmware/. $(TARGET_DIR)/lib/firmware/; \
 	fi
 	if [ -d $(@D)/opt/nvidia/l4t-gpu-libs/nvgpu ]; then \
 		cp -a $(@D)/opt/nvidia/l4t-gpu-libs/nvgpu/. $(TARGET_DIR)/usr/lib/; \

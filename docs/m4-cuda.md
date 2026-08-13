@@ -68,11 +68,14 @@ Runtime comes after that proof.
 - Rootfs will blow past the 1 GiB slot immediately: do the 4 GiB GPT
   relayout with the first oversized build (full reflash via USB drive).
 
-**Status 2026-08-13:** kernel side DONE — nvgpu/hwpm modules +
-NVIDIA -nv DTBs built by package/nvidia-oot; /dev/nvgpu/igpu0 verified
-on hardware. Next: tegra GPU userspace libs (BSP tarball) + cuda-cudart
-+ TensorRT runtime packages; rootfs slots must grow (1 GiB → 4 GiB
-relayout) once real sizes are known.
+**Status 2026-08-13:** GPU inference verified on hardware. Kernel side
+(nvgpu/hwpm modules, -nv DTBs, /dev/nvgpu/igpu0), userspace
+(package/tegra-libs: CUDA driver stack + GA10B firmware;
+package/tensorrt-runtime: TensorRT 10.16 + cuda-cudart + trtexec), and
+the 4 GiB slot relayout are all deployed.
+`trtexec --onnx=mnist.onnx` builds and runs an engine on the iGPU
+(10.7k qps, 57 µs mean GPU compute). Remaining: Ortex/ONNX Runtime
+TensorRT-EP proof from IEx.
 
 ## Plan
 

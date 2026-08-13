@@ -68,10 +68,23 @@ NERVES_LINUX_PATCH_HASH = \
 		$(wildcard $(NERVES_DEFCONFIG_DIR)/linux/*.config)))
 NERVES_LINUX_PATCH_STAMP = $(LINUX_DIR)/.nerves-linux-patch-hash
 
+# nvidia-oot: its extract step post-processes the tree (e.g. stripping
+# -Werror), so .mk edits must discard the extracted build dir too.
+NERVES_NVOOT_HASH = \
+	$(call nerves-hash,$(sort $(wildcard $(NERVES_DEFCONFIG_DIR)/package/nvidia-oot/*)))
+NERVES_NVOOT_DIR = $(BUILD_DIR)/nvidia-oot-$(NVIDIA_OOT_VERSION)
+NERVES_NVOOT_STAMP = $(NERVES_NVOOT_DIR)/.nerves-pkg-hash
+
 NERVES_STALE_DISCARDED := \
-	$(call nerves-discard-if-stale,$(LINUX_DIR),$(NERVES_LINUX_PATCH_STAMP),$(NERVES_LINUX_PATCH_HASH))
+	$(call nerves-discard-if-stale,$(LINUX_DIR),$(NERVES_LINUX_PATCH_STAMP),$(NERVES_LINUX_PATCH_HASH)) \
+	$(call nerves-discard-if-stale,$(NERVES_NVOOT_DIR),$(NERVES_NVOOT_STAMP),$(NERVES_NVOOT_HASH))
 
 define NERVES_LINUX_RECORD_PATCH_HASH
 	echo $(NERVES_LINUX_PATCH_HASH) > $(NERVES_LINUX_PATCH_STAMP)
 endef
 LINUX_POST_PATCH_HOOKS += NERVES_LINUX_RECORD_PATCH_HASH
+
+define NVIDIA_OOT_RECORD_PKG_HASH
+	echo $(NERVES_NVOOT_HASH) > $(NERVES_NVOOT_STAMP)
+endef
+NVIDIA_OOT_POST_EXTRACT_HOOKS += NVIDIA_OOT_RECORD_PKG_HASH

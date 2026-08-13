@@ -69,6 +69,9 @@ BR2_PACKAGE_GPTFDISK_SGDISK=y
 # (nerves-boot-success runs it from erlinit every boot). host-zstd is
 # pulled in as its extract dependency.
 BR2_PACKAGE_NVBOOTCTRL=y
+# NVIDIA out-of-tree GPU modules (nvidia-oot, nvgpu, hwpm) - the kernel
+# side of M4 (docs/m4-cuda.md).
+BR2_PACKAGE_NVIDIA_OOT=y
 BR2_PACKAGE_CA_CERTIFICATES=y
 BR2_PACKAGE_DTC=y
 BR2_PACKAGE_LIBMNL=y

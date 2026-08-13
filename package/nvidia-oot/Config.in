@@ -1,0 +1,13 @@
+config BR2_PACKAGE_NVIDIA_OOT
+	bool "nvidia-oot kernel modules"
+	depends on BR2_LINUX_KERNEL
+	help
+	  NVIDIA's out-of-tree kernel modules for Jetson (nvidia-oot
+	  core + nvgpu + hwpm) from the L4T r39.2 public_sources
+	  release, built against the system kernel. Provides the GPU
+	  device (/dev/nvgpu/igpu0) that the CUDA userland drives.
+
+	  Display modules are not built (headless system).
+
+	  EXPERIMENTAL: see docs/m4-cuda.md; the module set and any
+	  in-tree driver replacements are still being validated.

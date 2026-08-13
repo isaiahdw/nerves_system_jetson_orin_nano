@@ -2,3 +2,4 @@
 # kernel modules (nvidia-oot/nvgpu) and the CUDA/TensorRT userland
 # arrive as further package/<name>/ entries sourced here.
 source "$NERVES_DEFCONFIG_DIR/package/nvbootctrl/Config.in"
+source "$NERVES_DEFCONFIG_DIR/package/nvidia-oot/Config.in"

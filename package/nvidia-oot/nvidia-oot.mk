@@ -43,16 +43,26 @@ NVIDIA_OOT_MAKE_ENV = \
 # parameter list" warnings being fatal. With them suppressed every
 # type reads as present and the build picks post-6.8 kernel APIs.
 # The strip above therefore excludes conftest's Makefile.
+# dtbs too: the upstream kernel DT has no GPU (ga10b) node on t234, so
+# nvgpu never probes under it. The OOT tree builds NVIDIA's full "-nv"
+# device trees (including tegra234-p3768-0000+p3767-0004-nv.dtb, the
+# exact 4GB-module DT the stock image boots) - kernel, modules and DT
+# all from the same L4T release.
 define NVIDIA_OOT_BUILD_CMDS
 	$(MAKE) -C $(@D) $(LINUX_MAKE_FLAGS) $(NVIDIA_OOT_MAKE_ENV) \
 		CC="$(TARGET_CC) -std=gnu17" LD="$(TARGET_LD)" AR="$(TARGET_AR)" \
 		OBJCOPY="$(TARGET_OBJCOPY)" \
 		modules
+	$(MAKE) -C $(@D) $(LINUX_MAKE_FLAGS) $(NVIDIA_OOT_MAKE_ENV) \
+		CC="$(TARGET_CC) -std=gnu17" LD="$(TARGET_LD)" AR="$(TARGET_AR)" \
+		OBJCOPY="$(TARGET_OBJCOPY)" \
+		dtbs
 endef
 
 define NVIDIA_OOT_INSTALL_TARGET_CMDS
 	$(MAKE) -C $(@D) $(LINUX_MAKE_FLAGS) $(NVIDIA_OOT_MAKE_ENV) \
 		modules_install
+	find $(@D) -name "tegra234-p3768*-nv.dtb" -exec cp -v {} $(BINARIES_DIR)/ \;
 endef
 
 $(eval $(generic-package))

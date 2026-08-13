@@ -29,7 +29,38 @@ A bad slot does NOT fail over automatically — recovery from a
 non-booting slot means the UEFI menu or reflashing. This is interim
 until firmware redundancy is enabled.
 
-## Enabling firmware rootfs A/B (future)
+## Enabling firmware rootfs A/B (procedure)
+
+Order matters; the software half ships FIRST (it is dual-mode and safe
+under redundancy-off):
+
+1. In the image you will boot: dual-mode `nerves-uefi-sync`
+   (name-swap at level 0, `nvbootctrl -t rootfs set-active-boot-slot`
+   with canonical names when redundancy is on), health-gated
+   `nerves-validate` wired into the application, and a factory task
+   that populates BOTH slots (never enable redundancy with an empty
+   APP_b - failover into it loops through recovery).
+2. Reflash QSPI from an x86 Linux host in recovery mode:
+   `sudo ROOTFS_AB=1 ROOTFS_RETRY_COUNT_MAX=3 ./flash.sh ...` (or the
+   l4t_initrd_flash equivalent). The UEFI menu has no redundancy
+   toggle and runtime variable rewrites are unproven - reflash is the
+   real path.
+3. Confirm: `nvbootctrl -t rootfs dump-slots-info` shows redundancy
+   on, both slots normal, retries 3.
+4. From then on GPT names stay canonical (p2=APP, p3=APP_b, no more
+   swapping); L4TLauncher picks the slot from UEFI state.
+
+Rules once redundancy is on:
+- Never verify early in boot (nerves-boot-success refuses; verify
+  lives only in nerves-validate, after application health checks) -
+  early verify marks a bad image good and kills failover.
+- Never hand-edit slot variables in the UEFI menu except for recovery.
+- Bench acceptance: corrupt the active slot -> ~3 failed boots ->
+  firmware boots the other slot; good upgrade -> sync -> reboot ->
+  validate; unhealthy-but-booting upgrade -> no validate -> retries
+  exhaust -> failover (or explicit revert).
+
+## Background: why reflash is the enable path
 
 - The documented NVIDIA path: reflash with `ROOTFS_AB=1
   ROOTFS_RETRY_COUNT_MAX=3` using NVIDIA's flash tools from recovery

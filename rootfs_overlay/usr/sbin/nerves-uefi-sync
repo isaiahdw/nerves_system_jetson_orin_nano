@@ -2,22 +2,22 @@
 #
 # Make the boot firmware agree with nerves_fw_active about which slot
 # boots next. Run after `fwup` upgrade/revert completes and before the
-# reboot.
+# reboot; reboot only if this exits 0.
 #
-# Mechanism (UEFI 36.4.3, rootfs A/B redundancy DISABLED - the current
-# state): L4TLauncher boots whichever boot partition is GPT-named "APP".
-# Slot switching is therefore a name swap between p2 and p3, written
-# with sgdisk. The rootfs is selected by each slot's extlinux root=
-# PARTUUID, which never changes - only the two FAT partitions' names
-# move. Idempotent: if the names already agree with nerves_fw_active,
-# nothing is written.
+# Two modes, selected by the firmware's RootfsRedundancyLevel:
 #
-# When RootfsRedundancyLevel is enabled in the firmware (a QSPI
-# provisioning step, see docs/provisioning.md), L4TLauncher instead picks
-# APP vs APP_b from its rootfs A/B state (RootfsStatusSlot* UEFI
-# variables + retry counters in a Tegra scratch register) and the name
-# swap must NOT be used. That path needs nvbootctrl (or scratch-register
-# access) and is not implemented yet; this script refuses to guess.
+#   Level 0 (redundancy off): L4TLauncher always boots the partition
+#   GPT-named "APP", so slot switching is a name swap between p2 and p3.
+#   No firmware failover exists in this mode.
+#
+#   Level != 0 (rootfs A/B enabled at QSPI provisioning,
+#   docs/provisioning.md): L4TLauncher picks APP (slot 0) or APP_b
+#   (slot 1) from its own slot state. Names must stay canonical
+#   (p2=APP, p3=APP_b) and switching goes through
+#   `nvbootctrl -t rootfs set-active-boot-slot` (a->0, b->1).
+#   Failover comes from the firmware's retry counters; a good boot is
+#   recorded by nerves-validate after the application passes health
+#   checks - never earlier.
 
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -31,25 +31,22 @@ case "$active" in
     *) echo "nerves-uefi-sync: no nerves_fw_active, nothing to do"; exit 0 ;;
 esac
 
-# Refuse the name-swap when firmware-level rootfs A/B is enabled: the
-# firmware would be picking slots by its own state at the same time.
+redundancy=0
 if [ -e "$EFIVARS/RootfsRedundancyLevel-$GUID" ]; then
     # sed, not tr: this busybox has no tr applet.
     level=$(od -An -j4 -N1 -tu1 "$EFIVARS/RootfsRedundancyLevel-$GUID" 2>/dev/null | sed 's/ //g')
-    if [ "${level:-0}" != "0" ]; then
-        echo "nerves-uefi-sync: rootfs redundancy is enabled in firmware;" >&2
-        echo "nerves-uefi-sync: name-swap switching disabled - nvbootctrl path not implemented" >&2
-        exit 1
-    fi
+    redundancy=${level:-0}
 fi
 
+p2name=$(sgdisk -i 2 "$DISK" 2>/dev/null | sed -n "s/^Partition name: '\(.*\)'$/\1/p")
+
 # sgdisk with retries: when this runs right after an fwup upgrade (the
-# nerves_ssh success_callback path), the device handle fwup held may not
-# be released yet and sgdisk fails transiently.
-swap_names() {
+# ssh_subsystem_fwup success_callback path), the device handle fwup held
+# may not be released yet and sgdisk fails transiently.
+sgdisk_retry() {
     n=0
     while [ $n -lt 5 ]; do
-        sgdisk -c 2:"$1" -c 3:"$2" "$DISK" && return 0
+        sgdisk "$@" "$DISK" && return 0
         rc=$?
         n=$((n + 1))
         echo "nerves-uefi-sync: sgdisk failed (rc=$rc), retry $n/5" >&2
@@ -58,9 +55,30 @@ swap_names() {
     return 1
 }
 
-# Which partition is currently named APP? Slot A's boot FAT is p2,
-# slot B's is p3 (fwup_include/fwup-common.conf).
-p2name=$(sgdisk -i 2 "$DISK" 2>/dev/null | sed -n "s/^Partition name: '\(.*\)'$/\1/p")
+if [ "$redundancy" != "0" ]; then
+    # Firmware rootfs A/B drives slot selection; names must be canonical.
+    if [ "$p2name" = "APP_b" ]; then
+        echo "nerves-uefi-sync: normalizing partition names (p2=APP, p3=APP_b)"
+        sgdisk_retry -c 2:APP -c 3:APP_b || exit 1
+    elif [ "$p2name" != "APP" ]; then
+        echo "nerves-uefi-sync: unexpected partition 2 name '$p2name'" >&2
+        exit 1
+    fi
+    case "$active" in
+        a) slot=0 ;;
+        b) slot=1 ;;
+    esac
+    current=$(nvbootctrl -t rootfs get-current-slot 2>/dev/null)
+    if [ "$current" = "$slot" ]; then
+        echo "nerves-uefi-sync: rootfs slot already $slot ($active)"
+        exit 0
+    fi
+    echo "nerves-uefi-sync: setting rootfs boot slot to $slot ($active)"
+    nvbootctrl -t rootfs set-active-boot-slot "$slot"
+    exit $?
+fi
+
+# Redundancy off: name-swap mode.
 case "$active/$p2name" in
     a/APP | b/APP_b)
         echo "nerves-uefi-sync: boot partition names already agree (active=$active)"
@@ -68,11 +86,11 @@ case "$active/$p2name" in
         ;;
     a/APP_b)
         echo "nerves-uefi-sync: pointing firmware at slot A"
-        swap_names APP APP_b
+        sgdisk_retry -c 2:APP -c 3:APP_b
         ;;
     b/APP)
         echo "nerves-uefi-sync: pointing firmware at slot B"
-        swap_names APP_b APP
+        sgdisk_retry -c 2:APP_b -c 3:APP
         ;;
     *)
         echo "nerves-uefi-sync: unexpected partition 2 name '$p2name'" >&2

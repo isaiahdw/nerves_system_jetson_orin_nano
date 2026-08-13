@@ -23,6 +23,30 @@ Build facts from `nvidia-kernel-oot.inc`:
 - The modules deliberately replace some in-tree drivers: host1x,
   tegra-bpmp-thermal, tegra-drm — blacklist/ordering care needed.
 
+## JetPack 7.2 userland version stack (from meta-tegra master, verified 2026-08-13)
+
+| Component | Version | Recipe reference |
+|---|---|---|
+| CUDA | 13.2 (cudart 13.2.75-1) | `recipes-devtools/cuda/` |
+| CUDA compat driver | 595.58.03-1ubuntu1 | `cuda-compat` |
+| cuDNN | 9.20.0.46-1 | `recipes-devtools/cudnn/` |
+| TensorRT | 10.16.2.10-1 | `recipes-devtools/gie/` |
+
+Debs fetched from `https://repo.download.nvidia.com/jetson` +
+class/pool paths per `l4t_deb_pkgfeed.bbclass`; version suffix pattern
+`<name>_<ver>_arm64.deb`.
+
+**Smoke-test strategy:** `tensorrt-trtexec-prebuilt` — trtexec ships as
+a prebuilt binary, so GPU+CUDA+TensorRT can be proven end-to-end
+(`trtexec --onnx=<model>`) with no CUDA cross-compilation. Ortex/ONNX
+Runtime comes after that proof.
+
+**Status 2026-08-13:** kernel side DONE — nvgpu/hwpm modules +
+NVIDIA -nv DTBs built by package/nvidia-oot; /dev/nvgpu/igpu0 verified
+on hardware. Next: tegra GPU userspace libs (BSP tarball) + cuda-cudart
++ TensorRT runtime packages; rootfs slots must grow (1 GiB → 4 GiB
+relayout) once real sizes are known.
+
 ## Plan
 
 1. `package/nvidia-oot`: build nvidia-oot + nvgpu (+hwpm) modules from

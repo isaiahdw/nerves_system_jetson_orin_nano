@@ -67,11 +67,14 @@ Rules once redundancy is on:
   mode (x86 Linux host required).
 - The UEFI 36.4.3 setup menu has **no** redundancy toggle (checked:
   Device Manager → NVIDIA Configuration → Boot Configuration).
-- `RootfsRedundancyLevel` exists as a **volatile** UEFI variable;
-  rewriting it non-volatile from Linux requires deleting it first
-  (`chattr -i` + `rm` on efivarfs, then create with NV attrs) and it is
-  unverified whether the firmware honors the override at next boot.
-  Experiment before relying on it.
+- Runtime enablement is **proven impossible on UEFI 36.4.3** (tested
+  2026-08-13, three ways): efivarfs delete/create from Linux fails
+  (`einval`/`erofs`, firmware variable policy), the UEFI Shell's
+  `setvar` fails the same way ("Unable to set" for both delete and
+  NV-create; contrast the Rootfs status variables, which are writable),
+  and files staged in the ESP at `EFI/NVDA/Variables/` are consumed by
+  the firmware at boot but not honored for this variable. The QSPI
+  reflash is the only path.
 - Once enabled: slot selection moves to RootfsStatusSlotA/B (GUID
   781e084c-a330-417c-b678-38e696380cb9) + retry counters in a Tegra
   scratch register; `nerves-uefi-sync` refuses the name swap in that

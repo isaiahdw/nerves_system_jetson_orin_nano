@@ -33,9 +33,10 @@ to IEx in ~8 s, no removable media.
 | A/B updates (upgrade + revert, both directions) | working, hardware-verified — **no automatic failover**, see below |
 | Per-boot firmware handshake (`nvbootctrl verify`) | working (`nerves-boot-success` via erlinit) |
 | efivarfs | mounted by erlinit |
-| Bluetooth (btusb/btrtl) | hci0 not registering yet (M3) |
+| Bluetooth (btusb/btrtl) | working — hci0 registers, firmware loads (kernel patch un-ignores 0bda:c822) |
+| cpufreq + thermal | working (tegra cpufreq, tj-thermal; schedutil default governor) |
 | 40-pin header UART | exposed as `ttyS*`/`ttyAMA0` under the upstream DT; mapping unverified (M3) |
-| USB camera (UVC) | no /dev/video* yet (M3) |
+| USB camera (UVC) | modules ready; untested, no camera attached yet (M3) |
 | GPU (CUDA/TensorRT) | not started (M4) |
 
 ## A/B updates: what works and what doesn't

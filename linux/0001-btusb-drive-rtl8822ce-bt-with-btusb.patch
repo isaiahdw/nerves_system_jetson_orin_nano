@@ -1,0 +1,21 @@
+btusb: drive the RTL8822CE Bluetooth radio (0bda:c822) with btusb
+
+The NVIDIA/Ubuntu tree marks 0bda:c822 BTUSB_IGNORE because stock
+JetPack handles this radio inside Realtek's out-of-tree rtl88x2ce
+driver stack. This system uses mainline rtw88 for the WiFi half and has
+no vendor BT driver, so restore mainline's classification and let
+btusb/btrtl own the radio (firmware rtl_bt/rtl8822cu_fw.bin from
+linux-firmware).
+
+--- a/drivers/bluetooth/btusb.c
++++ b/drivers/bluetooth/btusb.c
+@@ -507,7 +507,8 @@
+ 	/* Realtek 8822CE Bluetooth devices */
+ 	{ USB_DEVICE(0x0bda, 0xb00c), .driver_info = BTUSB_REALTEK |
+ 						     BTUSB_WIDEBAND_SPEECH },
+-	{ USB_DEVICE(0x0bda, 0xc822), .driver_info = BTUSB_IGNORE },
++	{ USB_DEVICE(0x0bda, 0xc822), .driver_info = BTUSB_REALTEK |
++						     BTUSB_WIDEBAND_SPEECH },
+
+ 	/* Realtek 8822CU Bluetooth devices */
+ 	{ USB_DEVICE(0x13d3, 0x3549), .driver_info = BTUSB_IGNORE },

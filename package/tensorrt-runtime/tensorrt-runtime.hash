@@ -1,0 +1,9 @@
+# From https://repo.download.nvidia.com/jetson/common/dists/r39.2/main/binary-arm64/Packages
+sha256  d02111e3600d91bef407fe537a4179445cdc73fb259bf1f83dd256804de1897e  libnvinfer10_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  a0ed45dd7fda97fd7ee67af5ee4ed5868cd12161618b1786b12122b73f34ad36  libnvinfer-lean10_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  a19ba2f43860e768045947f59a63fecd1464feeba353bfb6a096985b3a634710  libnvinfer-plugin10_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  d7490d02f1ec286843bf796fbd4d3d464ca963d2cf9ceefca1ae7b2b14a4203b  libnvinfer-vc-plugin10_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  c5812d5f1fa4036a3c2710c53722ed96e87885a4f615f528cc45a1e00b7c28fc  libnvinfer-dispatch10_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  f146cbcc4d5d0d29f2c0123dd6a4b16ed1159eff27d03beeab27bbe9a766bff8  libnvonnxparsers10_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  7a7de013265b50acb1839ec1e42c2e611a323446dd09142deced5b0cea052f56  libnvinfer-bin_10.16.2.10-1+cuda13.2_arm64.deb
+sha256  d29c8f33d6b663f9b1fa4accc9bc0ca508012ebeea5f9b74f8e552688ec1268f  cuda-cudart-13-2_13.2.75-1_arm64.deb

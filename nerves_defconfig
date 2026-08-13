@@ -72,6 +72,8 @@ BR2_PACKAGE_NVBOOTCTRL=y
 # NVIDIA out-of-tree GPU modules (nvidia-oot, nvgpu, hwpm) - the kernel
 # side of M4 (docs/m4-cuda.md).
 BR2_PACKAGE_NVIDIA_OOT=y
+# Proprietary GPU userspace (libcuda + RM stack) from the BSP tarball.
+BR2_PACKAGE_TEGRA_LIBS=y
 BR2_PACKAGE_CA_CERTIFICATES=y
 BR2_PACKAGE_DTC=y
 BR2_PACKAGE_LIBMNL=y
@@ -109,3 +111,5 @@ BR2_PACKAGE_ALSA_UTILS_APLAY=y
 BR2_PACKAGE_ALSA_UTILS_AMIXER=y
 BR2_PACKAGE_ALSA_UTILS_ALSACTL=y
 BR2_PACKAGE_ALSA_UTILS_SPEAKER_TEST=y
+# TensorRT 10.16 runtime + cudart + trtexec (GPU smoke test).
+BR2_PACKAGE_TENSORRT_RUNTIME=y

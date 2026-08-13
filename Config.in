@@ -3,3 +3,5 @@
 # arrive as further package/<name>/ entries sourced here.
 source "$NERVES_DEFCONFIG_DIR/package/nvbootctrl/Config.in"
 source "$NERVES_DEFCONFIG_DIR/package/nvidia-oot/Config.in"
+source "$NERVES_DEFCONFIG_DIR/package/tegra-libs/Config.in"
+source "$NERVES_DEFCONFIG_DIR/package/tensorrt-runtime/Config.in"

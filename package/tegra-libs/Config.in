@@ -1,0 +1,12 @@
+config BR2_PACKAGE_TEGRA_LIBS
+	bool "tegra GPU userspace libraries"
+	help
+	  NVIDIA's proprietary Tegra userspace for the GPU compute path,
+	  extracted from the L4T r39.2 BSP tarball's embedded Debian
+	  packages: nvidia-l4t-core (the libnvrm_* resource-manager
+	  stack), nvidia-l4t-cuda (CUDA driver-level libraries) and
+	  nvidia-l4t-cuda-nvgpu (the libcuda variant matching the nvgpu
+	  kernel driver this system uses - not the openrm variant).
+
+	  First cut installs the debs' full library payload; prune with
+	  real usage data (docs/m4-cuda.md).

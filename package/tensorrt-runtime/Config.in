@@ -1,0 +1,9 @@
+config BR2_PACKAGE_TENSORRT_RUNTIME
+	bool "tensorrt runtime"
+	select BR2_PACKAGE_TEGRA_LIBS
+	help
+	  TensorRT 10.16 runtime libraries, the ONNX parser, trtexec, and
+	  the CUDA runtime (cudart 13.2) from NVIDIA's JetPack 7.2 apt
+	  feed. TensorRT 10 needs no cuDNN. trtexec is the GPU smoke
+	  test: it can build and run an engine from an ONNX model with
+	  nothing else installed (docs/m4-cuda.md).

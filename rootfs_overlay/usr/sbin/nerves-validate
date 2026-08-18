@@ -1,34 +1,13 @@
 #!/bin/sh
 #
-# Mark the running firmware good, in both bookkeeping systems:
+# Mark the running firmware good: fwup's validate task sets
+# nerves_fw_validated=1 (gates upgrades and reverts) and writes GRUB's
+# saved_entry to the running slot, closing the one-shot next_entry
+# window the upgrade opened.
 #
-#   1. Nerves: fwup validate (nerves_fw_validated=1) - gates upgrades
-#      and reverts.
-#   2. Firmware: nvbootctrl verify - records a successful boot so the
-#      rootfs A/B retry counters reset.
-#
-# Call this from the application ONLY after real health checks pass.
-# With firmware redundancy enabled this is the ONLY place verify may
-# run: verifying earlier (e.g. from erlinit) would mark a bad image
-# good and defeat failover. (With redundancy off, nerves-boot-success
-# also verifies at every early boot - that is correct there because
-# only boot-chain retry counters are at stake, not slot selection.)
+# Call this from the application ONLY after real health checks pass:
+# until it runs, a reboot or crash falls back to the previous slot.
 
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
-rc=0
-
-fwup -a -t validate -d /dev/rootdisk0 --enable-trim -i /usr/share/fwup/ops.fw -q -U || {
-    echo "nerves-validate: fwup validate failed" >&2
-    rc=1
-}
-
-if [ -x /usr/sbin/nvbootctrl ]; then
-    nvbootctrl verify || echo "nerves-validate: nvbootctrl verify failed" >&2
-    # With rootfs redundancy enabled, also record the rootfs-slot boot
-    # success (separate from the boot-chain verify on some L4T versions;
-    # harmless when redundancy is off).
-    nvbootctrl -t rootfs verify 2>/dev/null || true
-fi
-
-exit $rc
+exec fwup -a -t validate -d /dev/rootdisk0 --enable-trim -i /usr/share/fwup/ops.fw -q -U

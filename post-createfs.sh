@@ -7,6 +7,14 @@ FWUP_CONFIG=$NERVES_DEFCONFIG_DIR/fwup.conf
 # Run the common post-image processing for nerves
 $BR2_EXTERNAL_NERVES_PATH/board/nerves-common/post-createfs.sh $TARGET_DIR $FWUP_CONFIG
 
+# Pad the kernel DTB with free space. The UEFI firmware applies its
+# device-tree overlays into the blob GRUB installs; with no free space
+# that application fails (FDT_ERR_NOSPACE) and the firmware invalidates
+# the whole FDT, so the kernel boots with an empty device tree.
+DTB=$BINARIES_DIR/tegra234-p3768-0000+p3767-0004-nv.dtb
+$HOST_DIR/bin/dtc -I dtb -O dtb -p 524288 "$DTB" -o "$DTB.padded"
+mv "$DTB.padded" "$DTB"
+
 # Drop the previous build's portable artifact before this one's is written.
 #
 # The container build volume is buildroot's output directory, and every build

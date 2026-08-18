@@ -41,10 +41,9 @@ BR2_LINUX_KERNEL_DTS_SUPPORT=y
 # The upstream-style DT for the Orin Nano Developer Kit carrier (p3768) with
 # the Orin Nano devkit module (p3767-0005). There is no in-tree DT for the
 # 4GB production module (p3767-0004) or the Waveshare carrier; this is the
-# closest match and RAM size comes from firmware, not the DT. The extlinux
-# configs also carry a no-FDT entry that boots on the UEFI-provided DT
-# instead. The .dtb basename must match the devicetree.dtb resource in
-# fwup.conf.
+# closest match and RAM size comes from firmware, not the DT. The boot
+# DT is the -nv variant built by package/nvidia-oot; its basename must
+# match the devicetree.dtb resource in fwup.conf and grub/grub.cfg.
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="nvidia/tegra234-p3768-0000+p3767-0005"
 BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
 BR2_PACKAGE_BUSYBOX_CONFIG="${BR2_EXTERNAL_NERVES_PATH}/board/nerves-common/busybox.config"
@@ -54,21 +53,13 @@ BR2_PACKAGE_F2FS_TOOLS=y
 # on the first boot after an image flash.
 BR2_PACKAGE_UTIL_LINUX=y
 BR2_PACKAGE_UTIL_LINUX_PARTX=y
-# efibootmgr/efivar for inspecting the UEFI boot state during bring-up.
-# Slot switching itself goes through nvbootctrl (packaged at M2).
+# efibootmgr/efivar for UEFI boot-state diagnostics (BootNext to the
+# UEFI shell is the bench backdoor; boot selection itself is GRUB's).
 BR2_PACKAGE_EFIVAR=y
 BR2_PACKAGE_EFIBOOTMGR=y
-# sgdisk: L4TLauncher selects the boot partition by GPT name (APP), and
-# bring-up on a machine whose stock NVMe also has an APP partition means
-# renaming that partition and being able to rename it back from here -
-# the stock OS cannot boot while renamed, so the tool must live in this
-# image, not there.
+# sgdisk: GPT inspection and repair from the running system.
 BR2_PACKAGE_GPTFDISK=y
 BR2_PACKAGE_GPTFDISK_SGDISK=y
-# nvbootctrl: marks boots successful so the UEFI retry counters reset
-# (nerves-boot-success runs it from erlinit every boot). host-zstd is
-# pulled in as its extract dependency.
-BR2_PACKAGE_NVBOOTCTRL=y
 # NVIDIA out-of-tree GPU modules (nvidia-oot, nvgpu, hwpm) - the kernel
 # side of M4 (docs/m4-cuda.md).
 BR2_PACKAGE_NVIDIA_OOT=y
@@ -97,9 +88,18 @@ BR2_PACKAGE_WPA_SUPPLICANT_WPA3=y
 BR2_PACKAGE_WPA_SUPPLICANT_CTRL_IFACE=y
 # Nerves 2.0 assembles the final rootfs on the host from this tar.
 BR2_TARGET_ROOTFS_TAR=y
+# GRUB (arm64-efi) is the boot manager: BOOTAA64.efi on the ESP. Slot
+# selection and one-shot upgrade fallback live in grubenv on the ESP
+# (grub/grub.cfg); no UEFI variables are involved.
+BR2_TARGET_GRUB2=y
+BR2_TARGET_GRUB2_ARM64_EFI=y
+BR2_TARGET_GRUB2_BUILTIN_MODULES_EFI="boot linux fat part_gpt normal configfile search search_fs_file search_label loadenv fdt echo test"
+BR2_TARGET_GRUB2_BUILTIN_CONFIG_EFI="${NERVES_DEFCONFIG_DIR}/grub/early.cfg"
+# host dtc pads the kernel DTB for UEFI overlay application (post-createfs.sh)
+BR2_PACKAGE_HOST_DTC=y
 BR2_PACKAGE_HOST_KMOD_XZ=y
 BR2_NERVES_SYSTEM_NAME="nerves_system_jetson_orin_nano"
-BR2_NERVES_ADDITIONAL_IMAGE_FILES="${NERVES_DEFCONFIG_DIR}/fwup.conf ${NERVES_DEFCONFIG_DIR}/extlinux-a.conf ${NERVES_DEFCONFIG_DIR}/extlinux-b.conf ${NERVES_DEFCONFIG_DIR}/uefi/BOOTAA64.efi"
+BR2_NERVES_ADDITIONAL_IMAGE_FILES="${NERVES_DEFCONFIG_DIR}/fwup.conf ${NERVES_DEFCONFIG_DIR}/grub/grub.cfg ${NERVES_DEFCONFIG_DIR}/grub/usb-boot.cfg ${NERVES_DEFCONFIG_DIR}/grub/grubenv-default-a ${NERVES_DEFCONFIG_DIR}/grub/grubenv-default-b ${NERVES_DEFCONFIG_DIR}/grub/grubenv-next-a ${NERVES_DEFCONFIG_DIR}/grub/grubenv-next-b"
 BR2_PACKAGE_NBTTY=y
 BR2_PACKAGE_NERVES_CONFIG=y
 BR2_PACKAGE_NERVES_CONFIG_ACCEPT_RNG_NOTICE=y

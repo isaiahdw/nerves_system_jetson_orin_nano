@@ -97,7 +97,20 @@ define TENSORRT_RUNTIME_RECORD_PKG_HASH
 endef
 TENSORRT_RUNTIME_POST_EXTRACT_HOOKS += TENSORRT_RUNTIME_RECORD_PKG_HASH
 
+# grub2: the early config is embedded into the EFI image at build time,
+# so a grub/ edit must discard the tree or the image ships stale.
+NERVES_GRUB2_HASH = \
+	$(call nerves-hash,$(sort $(wildcard $(NERVES_DEFCONFIG_DIR)/grub/*)))
+NERVES_GRUB2_DIR = $(BUILD_DIR)/grub2-$(GRUB2_VERSION)
+NERVES_GRUB2_STAMP = $(NERVES_GRUB2_DIR)/.nerves-pkg-hash
+
+define GRUB2_RECORD_PKG_HASH
+	echo $(NERVES_GRUB2_HASH) > $(NERVES_GRUB2_STAMP)
+endef
+GRUB2_POST_EXTRACT_HOOKS += GRUB2_RECORD_PKG_HASH
+
 NERVES_STALE_DISCARDED := \
+	$(call nerves-discard-if-stale,$(NERVES_GRUB2_DIR),$(NERVES_GRUB2_STAMP),$(NERVES_GRUB2_HASH)) \
 	$(call nerves-discard-if-stale,$(LINUX_DIR),$(NERVES_LINUX_PATCH_STAMP),$(NERVES_LINUX_PATCH_HASH)) \
 	$(call nerves-discard-if-stale,$(NERVES_NVOOT_DIR),$(NERVES_NVOOT_STAMP),$(NERVES_NVOOT_HASH)) \
 	$(call nerves-discard-if-stale,$(NERVES_TEGRA_LIBS_DIR),$(NERVES_TEGRA_LIBS_STAMP),$(NERVES_TEGRA_LIBS_HASH)) \

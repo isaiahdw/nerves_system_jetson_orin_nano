@@ -42,6 +42,15 @@ define TENSORRT_RUNTIME_INSTALL_TARGET_CMDS
 	if [ -e $(@D)/usr/src/tensorrt/bin/trtexec ]; then \
 		$(INSTALL) -m 0755 $(@D)/usr/src/tensorrt/bin/trtexec $(TARGET_DIR)/usr/bin/trtexec; \
 	fi
+	# The engine builder loads one builder-resource library per GPU
+	# architecture. This board's iGPU is sm87 (Orin), which TensorRT
+	# serves with the sm86 Ampere resource - there is no sm87 file, and
+	# the ptx JIT fallback does not satisfy the builder ("Unable to
+	# load library: libnvinfer_builder_resource_sm86" at engine build).
+	# The other architectures are ~1.7 GB of dead weight.
+	for f in $(TARGET_DIR)/usr/lib/libnvinfer_builder_resource_sm*.so.*; do \
+		case $$f in *_sm86*) ;; *) rm -f $$f ;; esac; \
+	done
 endef
 
 $(eval $(generic-package))

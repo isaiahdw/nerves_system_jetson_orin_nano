@@ -1,7 +1,7 @@
 # Nerves System: NVIDIA Jetson Orin Nano
 
 Nerves system for the NVIDIA Jetson Orin Nano. Boots via the module's
-QSPI UEFI firmware from NVMe.
+QSPI UEFI firmware from NVMe, with GRUB as the on-disk boot manager.
 
 | Hardware | Identity |
 |---|---|
@@ -13,135 +13,114 @@ QSPI UEFI firmware from NVMe.
 Portability: nothing load-bearing is Waveshare-specific. The system
 targets the Orin Nano module on devkit-compatible carriers (it boots the
 NVIDIA p3768 carrier device tree) and should run on the official devkit
-with an NVMe unmodified, except `rootfs_overlay/etc/nv_boot_control.conf`
-whose TNSPEC is hard-coded for the 4GB module SKU (p3767-0004) - an 8GB
-module (p3767-0003) needs that line adjusted. Hardware verification has
-only been done on the Waveshare carrier.
-
-**Status: boots on hardware.** Verified 2026-08-12 on an Orin Nano 4GB
-on the Waveshare JETSON-ORIN-IO-BASE carrier: standalone boot from NVMe
-to IEx in ~8 s, no removable media.
+with an NVMe unmodified. Hardware verification has only been done on the
+Waveshare carrier.
 
 | Feature | Status |
 |---|---|
-| Boot to IEx (ttyTCU0 console) | working (USB and NVMe, hardware-verified) |
+| Boot to IEx (ttyTCU0 console) | working — NVMe via GRUB, ~10 s |
+| A/B updates with automatic failover | working, hardware-verified (crash of an unvalidated slot falls back on its own) |
+| USB-first provisioning boot | working — an attached provisioner stick boots with no menus |
+| GPU (CUDA 13.2 / TensorRT 10.16, nvgpu OOT modules) | working — TensorRT engine build + inference verified on hardware |
 | Ethernet (RTL8168, `r8169`) | working, DHCP via VintageNet |
 | WiFi (RTL8822CE, `rtw88`) | working, WPA2 association + DHCP |
-| USB audio (ALSA) | card registers; playback untested |
+| Bluetooth (btusb/btrtl) | working — hci0 registers, firmware loads (kernel patch un-ignores 0bda:c822) |
 | Watchdog + heart | armed (`/dev/watchdog0`) |
 | App data partition (f2fs, auto-format/expand) | working |
-| A/B updates (upgrade + revert, both directions) | working, hardware-verified — **no automatic failover**, see below |
-| Per-boot firmware handshake (`nvbootctrl verify`) | working (`nerves-boot-success` via erlinit) |
-| efivarfs | mounted by erlinit |
-| Bluetooth (btusb/btrtl) | working — hci0 registers, firmware loads (kernel patch un-ignores 0bda:c822) |
 | cpufreq + thermal | working (tegra cpufreq, tj-thermal; schedutil default governor) |
-| 40-pin header UART | exposed as `ttyS*`/`ttyAMA0` under the upstream DT; mapping unverified (M3) |
-| USB camera (UVC) | modules ready; untested, no camera attached yet (M3) |
-| GPU (CUDA/TensorRT) | not started (M4) |
-
-## A/B updates: what works and what doesn't
-
-Firmware rootfs redundancy is deliberately **off** (`RootfsRedundancyLevel=0`,
-matching the QSPI as shipped), so L4TLauncher always boots the partition
-GPT-named `APP`. Slot switching is a name swap done by
-`/usr/sbin/nerves-uefi-sync` after fwup runs. Verified on hardware:
-upgrade A→B and B→A over ssh, revert in both directions, and per-boot
-success marking (without which the firmware latches the chain
-`Unbootable` after ~3 boots — recovery procedure in
-`docs/provisioning.md`).
-
-**No automatic failover exists in this mode.** A slot that passes the
-name swap but fails to boot stays selected until manual intervention
-(UEFI menu or reflash). That is the accepted interim trade-off until
-firmware redundancy (`ROOTFS_AB=1`) is provisioned; treat "A/B works" as
-"updates and reverts work", not "bad firmware self-heals".
-
-**Application contract:** the update flow must run `nerves-uefi-sync`
-after fwup succeeds and only reboot when it exits 0. The ssh update path
-is `ssh_subsystem_fwup` (what `nerves_ssh`/`mix upload` use), which reads
-its own application environment:
-
-```elixir
-config :ssh_subsystem_fwup,
-  success_callback: {MyApp.Firmware, :finish_update, []}
-# finish_update/0: run /usr/sbin/nerves-uefi-sync; reboot only on exit 0.
-```
-
-Skipping the hook reboots into the old slot while the Nerves metadata
-claims the new one.
-
-Bring-up notes: the boot chain requires the ESP (see `uefi/README.md`);
-`docs/provisioning.md` is the authoritative boot-chain reference,
-including the `Unbootable`-latch recovery walkthrough.
+| USB audio (ALSA) | card registers; playback untested |
+| 40-pin header UARTs (`ttyTHS1`/`ttyTHS2`) | exposed under the `-nv` DT |
+| USB camera (UVC) | modules ready; untested |
 
 ## Boot architecture
 
-Nothing bootloader-shaped ships in this image. The NVIDIA boot chain
-(BootROM → MB1/MB2 → UEFI/L4TLauncher) lives in the module's QSPI-NOR
-flash and is provisioned once with NVIDIA's tools. L4TLauncher picks a
-boot partition by GPT *name* — `APP` (slot A) or `APP_b` (slot B), fixed
-names — and reads `boot/extlinux/extlinux.conf` from it. The kernel boots
-via its EFI stub.
+The NVIDIA boot chain (BootROM → MB1/MB2 → UEFI) lives in the module's
+QSPI-NOR flash and never changes. UEFI's disk boot entry runs
+`EFI/BOOT/BOOTAA64.efi` from the ESP — GRUB (arm64-efi), built by this
+system with `grub/early.cfg` embedded. GRUB's policy, in order:
+
+1. **USB first** — an attached drive carrying `/nerves-usb-boot.cfg`
+   (the provisioning stick) boots instead of the internal disk.
+2. **A/B** — boot the slot selected by `EFI/BOOT/grubenv`. An upgrade
+   sets GRUB's one-shot `next_entry`, which is cleared before the new
+   slot is attempted: if it crashes, the watchdog reset boots the
+   validated slot. Validation (fwup ops `validate`, keyed on the
+   *running* slot) promotes `saved_entry`.
+3. **Degraded defaults** — missing/corrupt grubenv boots slot A; a slot
+   whose kernel fails to load falls back to the other slot.
+
+All boot state is the 1 KB `grubenv` file, written exclusively by fwup
+as whole-file resources (`fwup.conf` upgrades, `fwup-ops.conf`
+validate/revert). There are no UEFI variables, retry counters, or
+partition renames in the loop.
+
+The kernel DTB ships per-slot and is padded with free space at build
+time (`post-createfs.sh`): the UEFI firmware applies its device-tree
+overlays into the installed blob and fails without room, which surfaces
+as an empty DTB and a dead board.
 
 Disk layout (`fwup_include/fwup-common.conf`):
 
 | Partition | Name | FS | Contents |
 |---|---|---|---|
 | — | (raw @512 KB) | U-Boot env format | Nerves metadata (no U-Boot involved) |
-| p1 | `esp` | FAT32 | `EFI/BOOT/BOOTAA64.efi` = L4TLauncher (see `uefi/README.md`) |
-| p2 | `APP` | FAT32 | slot A: `boot/Image`, DTB, `boot/extlinux/extlinux.conf` |
-| p3 | `APP_b` | FAT32 | slot B: same |
-| p4 | `rootfs_a` | squashfs | Nerves rootfs A |
-| p5 | `rootfs_b` | squashfs | Nerves rootfs B |
+| p1 | `esp` | FAT32 (ESP) | `EFI/BOOT/`: GRUB, `grub.cfg`, `grubenv` |
+| p2 | `boot_a` | FAT32 (BOOTA) | slot A: `boot/Image`, padded DTB |
+| p3 | `boot_b` | FAT32 (BOOTB) | slot B: same |
+| p4 | `rootfs_a` | squashfs/erofs | Nerves rootfs A |
+| p5 | `rootfs_b` | squashfs/erofs | Nerves rootfs B |
 | p6 | `data` | f2fs | application data, expands to fill disk |
 
-With firmware redundancy off (the current state), L4TLauncher boots the
-partition GPT-named `APP`; `/usr/sbin/nerves-uefi-sync` swaps the
-`APP`/`APP_b` names to match `nerves_fw_active` after fwup runs, and
-`/usr/sbin/nerves-boot-success` (`nvbootctrl verify`) marks every boot
-good so the firmware's retry counters reset. Firmware-level failover
-arrives only with `ROOTFS_AB=1` provisioning — see
+The provisioning stick uses the same offsets with `prov_*` partition
+names, `PROV*` labels, and distinct GUIDs, so nothing on it can ever be
+mistaken for the internal disk (or vice versa).
+
+## Updates
+
+`mix upload` → fwup `upgrade.a`/`upgrade.b` writes the inactive slot,
+refreshes the ESP's GRUB files, and flips `grubenv` as its final
+resource — an interrupted upgrade still boots the old slot. The
+application must run `/usr/sbin/nerves-validate` only after real health
+checks pass; until then any reboot or crash returns to the previous
+slot. No success callback or post-fwup hook is needed.
+
+Full lifecycle, provisioning procedures, and bench-acceptance tests:
 `docs/provisioning.md`.
 
 ## Kernel
 
 NVIDIA's Jetson Linux r39.2 kernel (JetPack 7.2): the Ubuntu noble tree
 with Tegra patches, 6.8.12, pinned to the same commit meta-tegra master
-uses. Config = arm64 defconfig + `linux/nerves.config`. The DT is the
-in-tree devkit DT (`tegra234-p3768-0000+p3767-0005`); each extlinux
-config also has a `nerves-fwdt` entry that boots on the UEFI-provided DT
-instead. The NVIDIA out-of-tree modules (nvgpu etc.) are not integrated
-yet.
+uses. Config = arm64 defconfig + `linux/nerves.config` (squashfs and
+EROFS roots both built in). The boot DT is NVIDIA's
+`tegra234-p3768-0000+p3767-0004-nv.dtb` built by `package/nvidia-oot`
+alongside the out-of-tree GPU modules (nvidia-oot, nvgpu, hwpm), so
+kernel, modules, and DT are all r39.2. GPU userspace comes from
+`package/tegra-libs` (BSP tarball) and `package/tensorrt-runtime`
+(JetPack apt debs, pruned to the sm86 builder resource Orin uses).
 
 ## Building
 
-Same workflow as the other systems in this family:
+Same workflow as the other systems in this family. With Nerves 2.0
+tooling the system builds as an artifact:
 
 ```sh
-mix deps.get
-mix compile
+mix nerves.artifact.build nerves_system_jetson_orin_nano
 ```
 
 On an Apple Silicon host the build runs in Apple's `container` runtime
-automatically. The build volume is pinned by
-`.nerves/artifacts/<name>/.container_id` — do not delete it, or the next
-build starts from scratch (~hours). `tools/prune-build-volume.sh` reclaims
-space inside the volume.
+automatically, in a per-package volume. Host-side firmware assembly
+(Nerves 2.0) needs `sqfstar`/`mkfs.erofs`; note that Homebrew's
+mkfs.erofs multithreading is broken on macOS — use a
+`--disable-multithreading` build.
 
 ## Writing an image
 
-Bring-up (USB stick; UEFI prefers removable media by default):
-
-```sh
-fwup -a -t complete -i <firmware>.fw -d /dev/diskN   # macOS: diskutil unmountDisk first
-```
-
-The same `complete` task writes the NVMe at provisioning time. QSPI
-state, slot-switching mechanics, and boot-chain gotchas are in
-`docs/provisioning.md`.
+Two supported procedures only — offline provisioning stick or the
+`fwup_provision` ssh subsystem — documented in `docs/provisioning.md`.
 
 ## Console
 
 `ttyTCU0` (Tegra Combined UART) @ 115200 on the carrier's debug UART
-header, shared with the boot firmware. The ESP32 driver board is on
-`ttyTHS1` — never attach a console there.
+header, shared with the boot firmware. The 40-pin header UARTs
+(`ttyTHS1`/`ttyTHS2`) are left free for applications.

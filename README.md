@@ -1,7 +1,7 @@
 # Nerves System: NVIDIA Jetson Orin Nano
 
 Nerves system for the NVIDIA Jetson Orin Nano. Boots via the module's
-QSPI UEFI firmware from NVMe, with GRUB as the on-disk boot manager.
+QSPI UEFI firmware from NVMe, with GRUB as the on-disk boot manager. ** This is still a work in progress**
 
 | Hardware | Identity |
 |---|---|
